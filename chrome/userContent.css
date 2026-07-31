@@ -1,0 +1,88 @@
+/* ==========================================================================
+   ASTRA — New Tab / Home page background
+   ==========================================================================
+
+   Sets the New Tab and Home page background to `wallpaper.jpg`, sitting
+   next to this file. It currently holds a dark placeholder starfield-
+   and-moon image — replace wallpaper.jpg with any picture of your own
+   (same filename, any resolution) and it takes over immediately, no CSS
+   changes needed. The browser toolbar (userChrome.css) reads the same
+   file and crops it to the same top edge, so the two are designed to
+   look like one continuous photo — see the note in userChrome.css's
+   header for the technical limits of that illusion.
+
+   A dark gradient is layered over the image so the search bar, top
+   sites and text stay readable regardless of what picture you use.
+   Tune --astra-overlay-top / --astra-overlay-bottom below to taste
+   (higher alpha = darker/more readable, lower = more of your picture
+   shows through) — and keep the matching pair in userChrome.css's
+   :root in sync so the toolbar and page still match in tone.
+
+   Requires the same setup as userChrome.css — see that file's header
+   for install steps.
+
+   IF THE BACKGROUND STILL SHOWS AS A FLAT GREY SCREEN
+   That means this stylesheet isn't reaching the page at all (not a
+   positioning bug) — Firefox's New Tab page is React/"Activity Stream"
+   content and Mozilla has, in some versions, restricted how much of it
+   userContent.css can reach. Check, in order:
+     1. toolkit.legacyUserProfileCustomizations.stylesheets is `true`
+        in about:config, and Firefox was fully restarted afterwards
+        (not just reloaded).
+     2. wallpaper.jpg, userContent.css and userChrome.css all sit
+        directly inside <profile-folder>/chrome/ — exact filenames,
+        matching case (Linux/macOS are case-sensitive).
+     3. Open a brand-new tab (Ctrl/Cmd+T) rather than reloading an old
+        one — Activity Stream pages can be cached from before the
+        stylesheet loaded.
+   If it's still grey after all three, your Firefox version is likely
+   blocking external CSS on this page. The reliable fallback is
+   Firefox's own built-in feature: open a New Tab, click the pencil
+   ("Customize New Tab") in the bottom-right corner, and set your
+   picture as the background there — that always works since it's part
+   of the page itself rather than an injected stylesheet, though it
+   won't stay in sync with the toolbar the way wallpaper.jpg does.
+   ========================================================================== */
+
+@-moz-document url(about:newtab), url(about:home) {
+
+  :root {
+    --astra-overlay-top:    rgba(4, 5, 14, 0.45);
+    --astra-overlay-bottom: rgba(4, 5, 14, 0.72);
+
+    /* Belt-and-suspenders: neutralize Activity Stream's own background
+       variables in case they'd otherwise paint an opaque color above
+       or below our image. Harmless if these names don't exist. */
+    --newtab-background-color: transparent !important;
+    --newtab-background-color-secondary: transparent !important;
+  }
+
+  html {
+    background: transparent !important;
+  }
+
+  /* Activity Stream adds its own "activity-stream" class straight onto
+     <body> — target both so whichever is present gets the image. */
+  body,
+  body.activity-stream {
+    background-color: transparent !important;
+    background-image:
+      linear-gradient(180deg, var(--astra-overlay-top), var(--astra-overlay-bottom)),
+      url("wallpaper.jpg") !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-position: center top, center top !important;
+    background-size: cover, cover !important;
+    background-attachment: fixed, fixed !important;
+  }
+
+  /* Strip any opaque background Activity Stream paints on wrapper
+     elements *inside* the body so the image above shows through every
+     layer. These are descendants, not body itself, so this can't
+     clobber the rule above. */
+  #root,
+  .outer-wrapper,
+  main.outer-wrapper,
+  main {
+    background: transparent !important;
+  }
+}
