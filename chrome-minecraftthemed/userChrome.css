@@ -1,0 +1,666 @@
+/* ==========================================================================
+   BLOCKWORLD — a colorful Minecraft-themed skin for Firefox's browser chrome
+   ==========================================================================
+
+   WHAT THIS FILE DOES
+   This file re-skins Firefox's own UI (tab bar, toolbar, address bar,
+   menus, sidebar, scrollbars) with a blocky, Minecraft-inspired look:
+   square "GUI button" bevels instead of rounded corners, a hotbar-style
+   white outline on the active tab, and an enchantment-glint shimmer that
+   sweeps across it.
+
+   The toolbar cycles slowly and smoothly through pictures of all THREE
+   Minecraft dimensions — Overworld, Nether and The End — crossfading from
+   one into the next forever:
+
+     overworld.png   grass, dirt, a couple of trees, sun and clouds
+     nether.png      netherrack, glowstone, lava and a nether portal
+     end.png         floating end-stone islands, an obsidian pillar with
+                      a glowing end crystal, chorus plants, void + stars
+
+   All three are original pixel-art PNGs baked at low resolution and
+   scaled up with nearest-neighbor sampling (no smoothing), so they read
+   as chunky "blocks" — the same trick real Minecraft texture packs use.
+   `userContent.css` in this same folder plays the same three-way
+   crossfade full-screen behind the New Tab / Home page, in sync, so the
+   whole browser reads as one continuous world.
+
+   HOW TO INSTALL
+   1. Open Firefox, go to  about:config
+      Search for  toolkit.legacyUserProfileCustomizations.stylesheets
+      Set it to  true  (double-click it, or press Enter after selecting).
+   2. Open  about:support  and click "Open Folder" next to
+      "Profile Folder" (Windows/Linux) or "Show in Finder" (macOS).
+   3. Copy this entire `chrome-minecraftthemed` folder's contents
+      (userChrome.css, userContent.css, overworld.png, nether.png,
+      end.png) into a folder named exactly `chrome` inside that profile
+      folder, so you end up with:
+         <your-profile-folder>/chrome/userChrome.css
+         <your-profile-folder>/chrome/userContent.css
+         <your-profile-folder>/chrome/overworld.png
+         <your-profile-folder>/chrome/nether.png
+         <your-profile-folder>/chrome/end.png
+      (If you already have another theme's `chrome` folder installed,
+      rename it aside first or overwrite its files with these — only one
+      userChrome.css can be active at a time.)
+   4. Fully restart Firefox.
+
+   THE FONT
+   Minecraft's own in-game typeface is Mojang's property and isn't
+   bundled here. For the real look, grab the free, open-source
+   "Monocraft" font (MIT licensed — search GitHub for "IdreesInc
+   Monocraft"), which is a monospaced font built specifically to match
+   Minecraft's UI lettering. Drop the .ttf file into this same folder as
+   `Monocraft.ttf` and the @font-face rule below will pick it up
+   automatically — nothing else to change. Without it, the stylesheet
+   falls back to a plain monospace stack, so everything still works, it
+   just won't be pixel-perfect.
+
+   CUSTOMIZING
+   Everything visual is driven by the CSS variables in the :root block
+   right below. Change a color or timing there once and it updates
+   everywhere it's used. To change the pace of the dimension crossfade,
+   edit --mc-cycle-duration (and its matching copy in userContent.css).
+   ========================================================================== */
+
+@font-face {
+  font-family: "Monocraft";
+  src: url("Monocraft.ttf") format("truetype");
+  font-display: swap;
+}
+
+:root {
+  /* --- Palette: straight out of the inventory screen --- */
+  --mc-sky:              #62A0E2;
+  --mc-grass:            #5D9C43;
+  --mc-grass-light:      #6FBD52;
+  --mc-dirt:             #7A5230;
+  --mc-stone:            #8A8A8A;
+  --mc-stone-dark:       #545454;
+  --mc-stone-darker:     #2B2B2B;
+  --mc-planks:           #A9824B;
+
+  --mc-diamond:          #4AEDD9;
+  --mc-diamond-glow:     rgba(74, 237, 217, 0.55);
+  --mc-emerald:          #17DD62;
+  --mc-gold:             #FFD83D;
+  --mc-redstone:         #E4291B;
+  --mc-lapis:            #3355CC;
+  --mc-nether-red:       #8A2A1E;
+  --mc-end-purple:       #9B7FD4;
+
+  --mc-bg-panel:         #1E1E1E;         /* base toolbar / GUI panel surface */
+  --mc-bg-panel-glass:   rgba(20, 20, 20, 0.82);
+  --mc-bg-panel-glass-light: rgba(30, 30, 30, 0.92);
+  --mc-bg-slot:          rgba(0, 0, 0, 0.55);   /* inventory-slot dark inset */
+
+  --mc-text:             #E4E4E4;
+  --mc-text-dim:         #A5A5A5;
+  --mc-text-shadow:      1px 1px 0 rgba(0, 0, 0, 0.6);
+
+  /* Overlay tint painted over the dimension pictures in the toolbar — keep
+     these equal to the copies in userContent.css so toolbar and page match. */
+  --mc-overlay-top:      rgba(10, 10, 10, 0.35);
+  --mc-overlay-bottom:   rgba(8, 8, 8, 0.65);
+
+  /* Classic GUI-button bevel: light edge top/left, dark edge bottom/right */
+  --mc-bevel-light:      rgba(255, 255, 255, 0.35);
+  --mc-bevel-dark:       rgba(0, 0, 0, 0.55);
+
+  /* --- Motion --- */
+  --mc-ease:             cubic-bezier(0.22, 1, 0.36, 1);
+  --mc-duration-fast:    100ms;
+  --mc-duration:         160ms;
+  --mc-duration-slow:    260ms;
+  --mc-cycle-duration:   30s;   /* one full Overworld -> Nether -> End -> loop */
+  --mc-drift-duration:   18s;
+  --mc-glint-duration:   3.2s;
+
+  /* --- Shape: Minecraft GUI has (almost) no rounded corners --- */
+  --mc-radius-sm:        0px;
+  --mc-radius:           2px;
+  --mc-radius-lg:        3px;
+
+  --tab-border-radius: var(--mc-radius);
+
+  font-family: "Monocraft", "Minecraftia", "Consolas", "Lucida Console", monospace;
+}
+
+/* ==========================================================================
+   1. Global surfaces — the three-dimension crossfade
+   ========================================================================== */
+
+#navigator-toolbox,
+#titlebar {
+  position: relative;
+  background-color: var(--mc-stone-darker) !important;
+  background-image:
+    linear-gradient(180deg, var(--mc-overlay-top), var(--mc-overlay-bottom)),
+    url("overworld.png") !important;
+  background-repeat: no-repeat, no-repeat !important;
+  background-position: center top, center top !important;
+  background-size: cover, cover !important;
+  background-attachment: fixed, fixed !important;
+  image-rendering: pixelated;
+  border-bottom: 2px solid var(--mc-stone-darker) !important;
+  box-shadow: 0 3px 0 0 var(--mc-bevel-dark);
+}
+
+/* Nether crossfades in over the Overworld base, then back out */
+#navigator-toolbox::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  image-rendering: pixelated;
+  background-image:
+    linear-gradient(180deg, var(--mc-overlay-top), var(--mc-overlay-bottom)),
+    url("nether.png");
+  background-repeat: no-repeat, no-repeat;
+  background-position: center top, center top;
+  background-size: cover, cover;
+  opacity: 0;
+  animation: mc-nether-fade var(--mc-cycle-duration) ease-in-out infinite;
+}
+
+/* The End crossfades in over whatever's currently showing, then back out
+   to reveal the Overworld again — closing the loop seamlessly */
+#navigator-toolbox::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  image-rendering: pixelated;
+  background-image:
+    linear-gradient(180deg, var(--mc-overlay-top), var(--mc-overlay-bottom)),
+    url("end.png");
+  background-repeat: no-repeat, no-repeat;
+  background-position: center top, center top;
+  background-size: cover, cover;
+  opacity: 0;
+  animation: mc-end-fade var(--mc-cycle-duration) ease-in-out infinite;
+}
+
+@keyframes mc-nether-fade {
+  0%   { opacity: 0; }
+  29%  { opacity: 0; }
+  33%  { opacity: 1; }
+  62%  { opacity: 1; }
+  66%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+@keyframes mc-end-fade {
+  0%   { opacity: 0; }
+  62%  { opacity: 0; }
+  66%  { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Slow ambient drift so the current scene never sits perfectly still */
+#navigator-toolbox {
+  animation: mc-drift var(--mc-drift-duration) ease-in-out infinite alternate;
+}
+
+@keyframes mc-drift {
+  from { background-position: center top, center 0%; }
+  to   { background-position: center top, center 4%; }
+}
+
+/* Real toolbar rows must paint above the decorative crossfade layers */
+#TabsToolbar,
+#nav-bar,
+#PersonalToolbar {
+  position: relative;
+  z-index: 1;
+}
+
+#titlebar {
+  color: var(--mc-text) !important;
+}
+
+.titlebar-buttonbox-container {
+  color: var(--mc-text) !important;
+}
+
+toolbar {
+  background: transparent !important;
+  color: var(--mc-text) !important;
+  text-shadow: var(--mc-text-shadow);
+}
+
+/* ==========================================================================
+   2. Tab bar & tabs
+   ========================================================================== */
+
+#TabsToolbar {
+  background: transparent !important;
+  min-height: 42px;
+}
+
+#tabbrowser-tabs,
+#tabbrowser-arrowscrollbox {
+  background: transparent !important;
+}
+
+.tabbrowser-tab {
+  transition:
+    transform var(--mc-duration) var(--mc-ease),
+    opacity var(--mc-duration) var(--mc-ease),
+    max-width var(--mc-duration) var(--mc-ease),
+    min-width var(--mc-duration) var(--mc-ease) !important;
+}
+
+/* Opening a tab: pop in like a placed block */
+.tabbrowser-tab[fadein] {
+  animation: mc-tab-in var(--mc-duration-slow) var(--mc-ease);
+}
+
+@keyframes mc-tab-in {
+  from { opacity: 0; transform: scale(0.85); }
+  60%  { transform: scale(1.04); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.tabbrowser-tab[closing] {
+  transition:
+    max-width var(--mc-duration) var(--mc-ease),
+    opacity var(--mc-duration-fast) ease-out !important;
+}
+
+/* GUI-button bevel: stone-grey block with a light top/left edge and a
+   dark bottom/right edge, just like inventory & hotbar slots */
+.tab-background {
+  background-color: var(--mc-stone-dark) !important;
+  border-radius: 0 !important;
+  box-shadow:
+    inset 2px 2px 0 0 var(--mc-bevel-light),
+    inset -2px -2px 0 0 var(--mc-bevel-dark) !important;
+  transition: background-color var(--mc-duration) var(--mc-ease) !important;
+  margin-block: 5px !important;
+  margin-inline: 2px !important;
+}
+
+.tabbrowser-tab:not([selected]) .tab-background {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.tabbrowser-tab:not([selected]):hover .tab-background {
+  background-color: rgba(138, 138, 138, 0.35) !important;
+  box-shadow:
+    inset 2px 2px 0 0 rgba(255, 255, 255, 0.18),
+    inset -2px -2px 0 0 rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Selected tab: hotbar "selected slot" white outline + enchantment glint */
+.tabbrowser-tab[selected] .tab-background {
+  position: relative;
+  background-color: var(--mc-stone) !important;
+  box-shadow:
+    inset 2px 2px 0 0 var(--mc-bevel-light),
+    inset -2px -2px 0 0 var(--mc-bevel-dark),
+    0 0 0 2px #ffffff,
+    0 0 10px -1px var(--mc-diamond-glow) !important;
+  overflow: hidden;
+}
+
+/* Diagonal shimmer sweeping across the selected tab, like an enchanted
+   item's glint in the inventory */
+.tabbrowser-tab[selected] .tab-background::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    115deg,
+    transparent 20%,
+    rgba(155, 127, 212, 0.55) 40%,
+    rgba(74, 237, 217, 0.65) 50%,
+    rgba(155, 127, 212, 0.55) 60%,
+    transparent 80%
+  );
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  animation: mc-glint var(--mc-glint-duration) ease-in-out infinite;
+}
+
+@keyframes mc-glint {
+  0%   { background-position: 130% 0; }
+  55%  { background-position: -30% 0; }
+  100% { background-position: -30% 0; }
+}
+
+.tab-label,
+.tab-icon-image {
+  color: var(--mc-text) !important;
+  fill: var(--mc-text) !important;
+  text-shadow: var(--mc-text-shadow);
+}
+
+.tabbrowser-tab[selected] .tab-label {
+  color: #ffffff !important;
+}
+
+.tabbrowser-tab:not([selected]) .tab-label {
+  color: var(--mc-text-dim) !important;
+}
+
+.tab-close-button {
+  border-radius: 0 !important;
+  transition: background-color var(--mc-duration-fast) var(--mc-ease),
+              transform var(--mc-duration-fast) var(--mc-ease) !important;
+}
+
+.tab-close-button:hover {
+  background-color: rgba(228, 41, 27, 0.55) !important;
+  transform: scale(1.08);
+}
+
+/* New Tab (+) button: crafting-table green accent on hover */
+#tabs-newtab-button,
+#new-tab-button {
+  border-radius: 0 !important;
+  transition: background-color var(--mc-duration-fast) var(--mc-ease),
+              transform var(--mc-duration-fast) var(--mc-ease) !important;
+}
+
+#tabs-newtab-button:hover {
+  background-color: rgba(23, 221, 98, 0.3) !important;
+  box-shadow: 0 0 0 2px var(--mc-emerald) !important;
+  transform: scale(1.05);
+}
+
+/* ==========================================================================
+   3. Navigation toolbar & address bar
+   ========================================================================== */
+
+#nav-bar {
+  background: transparent !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  padding-block: 5px;
+}
+
+/* Address bar styled like a Minecraft text-entry slot: dark inset box
+   with a squared-off stone bevel border */
+#urlbar-background {
+  background-color: var(--mc-bg-slot) !important;
+  border-radius: var(--mc-radius) !important;
+  box-shadow:
+    inset 1px 1px 0 0 var(--mc-bevel-dark),
+    inset -1px -1px 0 0 var(--mc-bevel-light),
+    0 0 0 1px var(--mc-stone-darker) !important;
+  transition: box-shadow var(--mc-duration) var(--mc-ease) !important;
+}
+
+#urlbar:hover > #urlbar-background {
+  box-shadow:
+    inset 1px 1px 0 0 var(--mc-bevel-dark),
+    inset -1px -1px 0 0 var(--mc-bevel-light),
+    0 0 0 1px var(--mc-stone) !important;
+}
+
+#urlbar[focused="true"] > #urlbar-background {
+  box-shadow:
+    inset 1px 1px 0 0 var(--mc-bevel-dark),
+    inset -1px -1px 0 0 var(--mc-bevel-light),
+    0 0 0 2px var(--mc-emerald),
+    0 0 8px 0 rgba(23, 221, 98, 0.45) !important;
+}
+
+#urlbar-input,
+.urlbar-input-box {
+  color: var(--mc-text) !important;
+  text-shadow: var(--mc-text-shadow);
+}
+
+.urlbarView {
+  background-color: var(--mc-bg-panel-glass-light) !important;
+  border-radius: var(--mc-radius) !important;
+  box-shadow:
+    inset 1px 1px 0 0 var(--mc-bevel-light),
+    inset -1px -1px 0 0 var(--mc-bevel-dark),
+    0 0 0 1px var(--mc-stone-darker),
+    0 12px 28px -8px rgba(0, 0, 0, 0.75) !important;
+  overflow: hidden;
+  animation: mc-panel-in var(--mc-duration) var(--mc-ease);
+}
+
+.urlbarView-row {
+  border-radius: 0 !important;
+  transition: background-color var(--mc-duration-fast) var(--mc-ease) !important;
+}
+
+.urlbarView-row[selected],
+.urlbarView-row:hover {
+  background-color: rgba(74, 237, 217, 0.16) !important;
+}
+
+.urlbarView-row-inner,
+.urlbarView-title,
+.urlbarView-url {
+  color: var(--mc-text) !important;
+}
+
+/* Generic toolbar buttons (back/forward/reload/star/extensions...) */
+toolbarbutton {
+  border-radius: var(--mc-radius-sm) !important;
+  transition: background-color var(--mc-duration-fast) var(--mc-ease),
+              box-shadow var(--mc-duration-fast) var(--mc-ease),
+              transform var(--mc-duration-fast) var(--mc-ease) !important;
+}
+
+toolbarbutton:hover,
+#urlbar-container .urlbar-icon:hover {
+  background-color: rgba(138, 138, 138, 0.3) !important;
+  box-shadow:
+    inset 1px 1px 0 0 var(--mc-bevel-light),
+    inset -1px -1px 0 0 var(--mc-bevel-dark) !important;
+}
+
+toolbarbutton:hover:active {
+  transform: scale(0.92);
+  box-shadow:
+    inset -1px -1px 0 0 var(--mc-bevel-light),
+    inset 1px 1px 0 0 var(--mc-bevel-dark) !important;
+}
+
+toolbarbutton > .toolbarbutton-icon,
+.urlbar-icon {
+  fill: var(--mc-text) !important;
+  color: var(--mc-text) !important;
+}
+
+/* ==========================================================================
+   4. Bookmarks toolbar
+   ========================================================================== */
+
+#PersonalToolbar {
+  background: transparent !important;
+  border-top: none !important;
+}
+
+.bookmark-item {
+  border-radius: var(--mc-radius-sm) !important;
+  color: var(--mc-text) !important;
+  text-shadow: var(--mc-text-shadow);
+  transition: background-color var(--mc-duration-fast) var(--mc-ease) !important;
+}
+
+.bookmark-item:hover {
+  background-color: rgba(138, 138, 138, 0.3) !important;
+  box-shadow:
+    inset 1px 1px 0 0 var(--mc-bevel-light),
+    inset -1px -1px 0 0 var(--mc-bevel-dark) !important;
+}
+
+/* ==========================================================================
+   5. Panels & menus (hamburger menu, context menus, downloads, etc.)
+   ========================================================================== */
+
+panel,
+menupopup {
+  --panel-background: var(--mc-bg-panel-glass-light);
+  --panel-color: var(--mc-text);
+  --panel-border-color: var(--mc-stone-darker);
+  --panel-shadow-margin: 8px;
+  --arrowpanel-border-radius: var(--mc-radius);
+}
+
+panel[type="arrow"]::part(content),
+.panel-arrowcontent {
+  background-color: var(--mc-bg-panel-glass-light) !important;
+  color: var(--mc-text) !important;
+  border-radius: var(--mc-radius) !important;
+  box-shadow:
+    inset 1px 1px 0 0 var(--mc-bevel-light),
+    inset -1px -1px 0 0 var(--mc-bevel-dark),
+    0 0 0 1px var(--mc-stone-darker),
+    0 16px 40px -10px rgba(0, 0, 0, 0.75) !important;
+  animation: mc-panel-in var(--mc-duration) var(--mc-ease);
+}
+
+menupopup {
+  animation: mc-panel-in var(--mc-duration-fast) var(--mc-ease);
+}
+
+@keyframes mc-panel-in {
+  from { opacity: 0; transform: translateY(-3px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+menuitem,
+.subviewbutton,
+toolbarbutton.subviewbutton {
+  border-radius: var(--mc-radius-sm) !important;
+  color: var(--mc-text) !important;
+  text-shadow: var(--mc-text-shadow);
+  transition: background-color var(--mc-duration-fast) var(--mc-ease) !important;
+}
+
+menuitem:hover,
+.subviewbutton:hover {
+  background-color: rgba(74, 237, 217, 0.18) !important;
+}
+
+/* ==========================================================================
+   6. Sidebar
+   ========================================================================== */
+
+#sidebar-box,
+#sidebar {
+  background-color: var(--mc-bg-panel) !important;
+  color: var(--mc-text) !important;
+}
+
+#sidebar-header {
+  background-color: var(--mc-stone-darker) !important;
+  border-bottom: 2px solid var(--mc-stone-dark) !important;
+  color: var(--mc-text) !important;
+  text-shadow: var(--mc-text-shadow);
+}
+
+/* ==========================================================================
+   7. Find bar
+   ========================================================================== */
+
+.findbar-container {
+  background-color: var(--mc-bg-panel) !important;
+  color: var(--mc-text) !important;
+  border-top: 2px solid var(--mc-stone-dark) !important;
+}
+
+.findbar-textbox {
+  background-color: var(--mc-bg-slot) !important;
+  color: var(--mc-text) !important;
+  border-radius: var(--mc-radius-sm) !important;
+  box-shadow:
+    inset 1px 1px 0 0 var(--mc-bevel-dark),
+    inset -1px -1px 0 0 var(--mc-bevel-light) !important;
+}
+
+/* ==========================================================================
+   8. Tooltips, link-preview status panel, selection & focus polish
+   ========================================================================== */
+
+tooltip {
+  appearance: none !important;
+  background-color: var(--mc-bg-panel-glass-light) !important;
+  color: var(--mc-text) !important;
+  text-shadow: var(--mc-text-shadow);
+  border-radius: var(--mc-radius-sm) !important;
+  box-shadow:
+    inset 1px 1px 0 0 var(--mc-bevel-light),
+    inset -1px -1px 0 0 var(--mc-bevel-dark),
+    0 0 0 1px var(--mc-stone-darker),
+    0 8px 20px -6px rgba(0, 0, 0, 0.7) !important;
+  padding: 4px 8px !important;
+}
+
+#statuspanel-label {
+  background-color: var(--mc-bg-panel-glass-light) !important;
+  color: var(--mc-text) !important;
+  text-shadow: var(--mc-text-shadow);
+  border-radius: var(--mc-radius-sm) !important;
+  box-shadow: 0 0 0 1px var(--mc-stone-darker) !important;
+}
+
+#urlbar-input::selection,
+.tab-label::selection {
+  background-color: var(--mc-diamond-glow) !important;
+  color: #002b28 !important;
+}
+
+toolbarbutton:focus-visible,
+#tabs-newtab-button:focus-visible,
+.tabbrowser-tab:focus-visible .tab-background {
+  outline: 2px solid var(--mc-gold) !important;
+  outline-offset: 2px;
+  border-radius: 0;
+}
+
+/* ==========================================================================
+   9. Scrollbars (chrome UI only — page scrollbars are handled by
+      userContent.css / site styling)
+   ========================================================================== */
+
+#sidebar-box,
+panel,
+menupopup,
+.urlbarView {
+  scrollbar-color: var(--mc-stone) var(--mc-bg-panel);
+  scrollbar-width: thin;
+}
+
+/* ==========================================================================
+   10. Motion preferences
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .tabbrowser-tab,
+  .tab-background,
+  .tab-background::after,
+  .tab-close-button,
+  #tabs-newtab-button,
+  #navigator-toolbox,
+  #navigator-toolbox::before,
+  #navigator-toolbox::after,
+  toolbarbutton,
+  #urlbar-background,
+  .urlbarView-row,
+  .bookmark-item,
+  menuitem,
+  .subviewbutton {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  #navigator-toolbox::before,
+  #navigator-toolbox::after {
+    opacity: 0 !important;
+  }
+}

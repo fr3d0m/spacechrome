@@ -1,0 +1,145 @@
+/* ==========================================================================
+   BLOCKWORLD — New Tab / Home page background
+   ==========================================================================
+
+   Plays the same three-dimension crossfade used behind the toolbar in
+   userChrome.css — Overworld, then Nether, then The End, looping forever
+   — full-screen behind the New Tab and Home page, in sync, using the
+   same three PNGs (overworld.png, nether.png, end.png) sitting next to
+   this file.
+
+   A dark gradient sits on top of whichever picture is showing so the
+   search bar, top sites and text stay readable. Tune --mc-overlay-top /
+   --mc-overlay-bottom below to taste (higher alpha = darker/more
+   readable, lower = more of the scene shows through) — and keep the
+   matching pair in userChrome.css's :root in sync so the toolbar and
+   page still match in tone. To change the pace of the crossfade, edit
+   --mc-cycle-duration here AND in userChrome.css.
+
+   Requires the same setup as userChrome.css — see that file's header
+   for install steps.
+
+   IF THE BACKGROUND STILL SHOWS AS A FLAT GREY SCREEN
+   That means this stylesheet isn't reaching the page at all (not a
+   positioning bug) — Firefox's New Tab page is React/"Activity Stream"
+   content and Mozilla has, in some versions, restricted how much of it
+   userContent.css can reach. Check, in order:
+     1. toolkit.legacyUserProfileCustomizations.stylesheets is `true`
+        in about:config, and Firefox was fully restarted afterwards
+        (not just reloaded).
+     2. overworld.png, nether.png, end.png, userContent.css and
+        userChrome.css all sit directly inside <profile-folder>/chrome/
+        — exact filenames, matching case (Linux/macOS are
+        case-sensitive).
+     3. Open a brand-new tab (Ctrl/Cmd+T) rather than reloading an old
+        one — Activity Stream pages can be cached from before the
+        stylesheet loaded.
+   If it's still grey after all three, your Firefox version is likely
+   blocking external CSS on this page. The reliable fallback is
+   Firefox's own built-in feature: open a New Tab, click the pencil
+   ("Customize New Tab") in the bottom-right corner, and set one of the
+   three PNGs as the background there — that always works since it's
+   part of the page itself rather than an injected stylesheet, though it
+   won't crossfade or stay in sync with the toolbar.
+   ========================================================================== */
+
+@-moz-document url(about:newtab), url(about:home) {
+
+  :root {
+    --mc-overlay-top:    rgba(10, 10, 10, 0.35);
+    --mc-overlay-bottom: rgba(8, 8, 8, 0.65);
+    --mc-cycle-duration: 30s;
+
+    --newtab-background-color: transparent !important;
+    --newtab-background-color-secondary: transparent !important;
+  }
+
+  html {
+    background: transparent !important;
+  }
+
+  body,
+  body.activity-stream {
+    position: relative;
+    background-color: #0e0e0e !important;
+    background-image:
+      linear-gradient(180deg, var(--mc-overlay-top), var(--mc-overlay-bottom)),
+      url("overworld.png") !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-position: center top, center top !important;
+    background-size: cover, cover !important;
+    background-attachment: fixed, fixed !important;
+    image-rendering: pixelated;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    image-rendering: pixelated;
+    background-image:
+      linear-gradient(180deg, var(--mc-overlay-top), var(--mc-overlay-bottom)),
+      url("nether.png");
+    background-repeat: no-repeat, no-repeat;
+    background-position: center top, center top;
+    background-size: cover, cover;
+    opacity: 0;
+    animation: mc-content-nether-fade var(--mc-cycle-duration) ease-in-out infinite;
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    image-rendering: pixelated;
+    background-image:
+      linear-gradient(180deg, var(--mc-overlay-top), var(--mc-overlay-bottom)),
+      url("end.png");
+    background-repeat: no-repeat, no-repeat;
+    background-position: center top, center top;
+    background-size: cover, cover;
+    opacity: 0;
+    animation: mc-content-end-fade var(--mc-cycle-duration) ease-in-out infinite;
+  }
+
+  @keyframes mc-content-nether-fade {
+    0%   { opacity: 0; }
+    29%  { opacity: 0; }
+    33%  { opacity: 1; }
+    62%  { opacity: 1; }
+    66%  { opacity: 0; }
+    100% { opacity: 0; }
+  }
+
+  @keyframes mc-content-end-fade {
+    0%   { opacity: 0; }
+    62%  { opacity: 0; }
+    66%  { opacity: 1; }
+    95%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    body::before,
+    body::after {
+      animation: none !important;
+      opacity: 0 !important;
+    }
+  }
+
+  /* Strip any opaque background Activity Stream paints on wrapper
+     elements *inside* the body, and make sure real page content paints
+     above the crossfade layers (which are position: fixed at z-index 0). */
+  #root,
+  .outer-wrapper,
+  main.outer-wrapper,
+  main {
+    position: relative;
+    z-index: 1;
+    background: transparent !important;
+  }
+}
